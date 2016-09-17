@@ -1,38 +1,33 @@
-Kairsten's Code Book for Week 4 Assignment - Course 3 - Johns Hopkins Data Science on Coursera
+Kairsten Fay's Week 4 Assignment - Course 3 - Johns Hopkins Data Science on Coursera
 --------------------
-This codebook is in addition to the README.txt file supplied with the UCI HAR Dataset. I made some modifications to the data variable names.
+This README is meant to update the README.txt file supplied with the UCI HAR Dataset. 
+Here, I made modifications to the way the data are presented.
 
+
+R file:
 To create a tidy dataset, I used the script run_analysis.R. 
+The main objective of this analysis was to tidy the data found in the UCI HAR dataset. To do this, I:
+1. Loaded the data according to the variables mentioned in the codebook.txt file.
+2. Created 'test' and 'train' datasets by using cbind on the test and train data, respectively. 
+	Note: From the 'X' data, I used only measurements from that pertained to a mean or a standard deviation. 
+	I bound these 'mean' or 'std' measurements to my train and test datasets.
+3. Combined the test and train data into one larger data frame by using 'rbind'
+4. Removed symbols such as parentheses, hyphens, and underscores from variable names. I used activity names 
+	(instead of activity number, as was found in the Y data), and removed uppercase letters and underscores from these. 
 
-My variable names are as defined:
-
-## features = list of all features. See "features_info.txt" for info about the variables
-## activity_labels = links the class labels with their activity name
-
-Train data
-## trainX = training set
-## trainY = training labels
-## train_subj = the subject who performed the activity for each window sample from 1-30
-
-The test data's descriptions are analagous to those of the train data.
-## testX = test set
-## testY = test labels
-## test_sub = test subject
-
-Explaining my run_analysis.R script:
-To main objective of this analysis was to tidy the data found in the UCI HAR dataset. To do this, I:
-1. Loaded the data according to the variables mentioned above.
-2. Used only measurements from the 'features' variable that pertained to a mean or a standard deviation, and bound these to my dataset.
-3. Combined the test and train data into one larger data frame
-4. removed symbols such as parentheses, hyphens, and underscores from variable names. I appended activity names (instead of activity number, as was found in the Y data). 
-
-The final, tidy dataset can be found in the data table named 'tidy_data' in R.
-
-Finally, in order to answer the final question, I used the code as described in ## Part 5 of my R script.
-I summarized each column after grouping by 'activity' and 'subject'.
+The final, tidy dataset crated from the R script can be found in the data table named 'tidy_data' in R.
 
 
-The original README.txt from UCI is below. Scroll past this to the bottom to see the feaures_info.txt for information about the features file.
+
+Finally, in order to answer the final question, I used the code below.
+
+5. Subset a dataframe with the mean of each measurement for each activity and subject
+my_means <- summarize_each(group_by(tidy_data, subject, activity), funs(mean))
+write.table(my_means, file = "step5.txt", row.name = FALSE)
+
+
+
+The original README.txt from UCI is below. 
 
 --------------------
 
@@ -109,74 +104,4 @@ Jorge L. Reyes-Ortiz, Alessandro Ghio, Luca Oneto, Davide Anguita. November 2012
 
 
 
-
-
-
-
-
-
-
-
 ---------------------------------------------------------------------
-
-
-Feature Selection 
-=================
-
-The features selected for this database come from the accelerometer and gyroscope 3-axial raw signals tAcc-XYZ and tGyro-XYZ. These time domain signals (prefix 't' to denote time) were captured at a constant rate of 50 Hz. Then they were filtered using a median filter and a 3rd order low pass Butterworth filter with a corner frequency of 20 Hz to remove noise. Similarly, the acceleration signal was then separated into body and gravity acceleration signals (tBodyAcc-XYZ and tGravityAcc-XYZ) using another low pass Butterworth filter with a corner frequency of 0.3 Hz. 
-
-Subsequently, the body linear acceleration and angular velocity were derived in time to obtain Jerk signals (tBodyAccJerk-XYZ and tBodyGyroJerk-XYZ). Also the magnitude of these three-dimensional signals were calculated using the Euclidean norm (tBodyAccMag, tGravityAccMag, tBodyAccJerkMag, tBodyGyroMag, tBodyGyroJerkMag). 
-
-Finally a Fast Fourier Transform (FFT) was applied to some of these signals producing fBodyAcc-XYZ, fBodyAccJerk-XYZ, fBodyGyro-XYZ, fBodyAccJerkMag, fBodyGyroMag, fBodyGyroJerkMag. (Note the 'f' to indicate frequency domain signals). 
-
-These signals were used to estimate variables of the feature vector for each pattern:  
-'-XYZ' is used to denote 3-axial signals in the X, Y and Z directions.
-
-tBodyAcc-XYZ
-tGravityAcc-XYZ
-tBodyAccJerk-XYZ
-tBodyGyro-XYZ
-tBodyGyroJerk-XYZ
-tBodyAccMag
-tGravityAccMag
-tBodyAccJerkMag
-tBodyGyroMag
-tBodyGyroJerkMag
-fBodyAcc-XYZ
-fBodyAccJerk-XYZ
-fBodyGyro-XYZ
-fBodyAccMag
-fBodyAccJerkMag
-fBodyGyroMag
-fBodyGyroJerkMag
-
-The set of variables that were estimated from these signals are: 
-
-mean(): Mean value
-std(): Standard deviation
-mad(): Median absolute deviation 
-max(): Largest value in array
-min(): Smallest value in array
-sma(): Signal magnitude area
-energy(): Energy measure. Sum of the squares divided by the number of values. 
-iqr(): Interquartile range 
-entropy(): Signal entropy
-arCoeff(): Autorregresion coefficients with Burg order equal to 4
-correlation(): correlation coefficient between two signals
-maxInds(): index of the frequency component with largest magnitude
-meanFreq(): Weighted average of the frequency components to obtain a mean frequency
-skewness(): skewness of the frequency domain signal 
-kurtosis(): kurtosis of the frequency domain signal 
-bandsEnergy(): Energy of a frequency interval within the 64 bins of the FFT of each window.
-angle(): Angle between to vectors.
-
-Additional vectors obtained by averaging the signals in a signal window sample. These are used on the angle() variable:
-
-gravityMean
-tBodyAccMean
-tBodyAccJerkMean
-tBodyGyroMean
-tBodyGyroJerkMean
-
-The complete list of variables of each feature vector is available in 'features.txt'
-
