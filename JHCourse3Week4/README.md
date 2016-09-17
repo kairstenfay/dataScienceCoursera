@@ -25,6 +25,7 @@ Finally, in order to answer the final question, I used the code below.
 5. Subset a dataframe with the mean of each measurement for each activity and subject
 
    my_means <- summarize_each(group_by(tidy_data, subject, activity), funs(mean))
+   
    write.table(my_means, file = "step5.txt", row.name = FALSE)
 
 
