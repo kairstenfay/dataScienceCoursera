@@ -1,15 +1,16 @@
-Kairsten Fay's Week 4 Assignment - Course 3 - Johns Hopkins Data Science on Coursera
+##Kairsten Fay's Week 4 Assignment - Course 3 - Johns Hopkins Data Science on Coursera
 --------------------
 This README is meant to update the README.txt file supplied with the UCI HAR Dataset. 
 Here, I made modifications to the way the data are presented.
 
 
-R file:
+#R file:
 To create a tidy dataset, I used the script run_analysis.R. 
 The main objective of this analysis was to tidy the data found in the UCI HAR dataset. To do this, I:
+
 1. Loaded the data according to the variables mentioned in the codebook.txt file.
 2. Created 'test' and 'train' datasets by using cbind on the test and train data, respectively. 
-	Note: From the 'X' data, I used only measurements from that pertained to a mean or a standard deviation. 
+..* Note: From the 'X' data, I used only measurements from that pertained to a mean or a standard deviation. 
 	I bound these 'mean' or 'std' measurements to my train and test datasets.
 3. Combined the test and train data into one larger data frame by using 'rbind'
 4. Removed symbols such as parentheses, hyphens, and underscores from variable names. I used activity names 
@@ -22,8 +23,9 @@ The final, tidy dataset crated from the R script can be found in the data table 
 Finally, in order to answer the final question, I used the code below.
 
 5. Subset a dataframe with the mean of each measurement for each activity and subject
-my_means <- summarize_each(group_by(tidy_data, subject, activity), funs(mean))
-write.table(my_means, file = "step5.txt", row.name = FALSE)
+
+... my_means <- summarize_each(group_by(tidy_data, subject, activity), funs(mean))
+... write.table(my_means, file = "step5.txt", row.name = FALSE)
 
 
 
