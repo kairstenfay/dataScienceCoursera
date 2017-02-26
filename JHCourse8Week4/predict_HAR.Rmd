@@ -1,0 +1,179 @@
+---
+title: "Predicting Exercise Format in R Using the caret Package"
+author: "Kairsten Fay"
+date: "February 25, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview  
+The Human Activity Recognition (HAR) dataset from UCI is a public domain dataset ([1](#1), [2](#2)). In recent years, the HAR dataset has enabled researchers around the world to develop machine learning tools to classify physical activity through wearable technology. Here, I classify bicep curls performed by six test subjects by the matter in which they performed the curls; this was categorized by the 'classe' variable in the dataset. The forms were the correct curl (A), curling while bringing elbows to the front (B), curling but lifting only halfway (C), curling but lowering only halfway (D), and curling while thrusting the hips forward (E). Of the various regression model approaches used, the random forest ensemble method produced the highest accuracy in predicting bicep curl form. When building the models in this project, I used cross-validation to optimize the parameters and to better fit the training data ([3](#3)). The work presented here is my own with non-negligible support and guidance from Cheng Juan's publication on practical machine learning using R, which I incidentally found when browsing Google for examples of cross validation in R ([4](#4)).  
+  
+## Downloading and Pre-processing  
+I began by downloading the training and testing data from the following URLs. Then, I looked at the structure of the testing (WLE) dataset. The first 7 columns were identifiers, and columns 8 through 160 were measurements. I removed the identifiers and converted the measurement data to numeric objects in R. Then, I removed columns which had missing data.  
+```{r}
+url1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+if (!file.exists("training.csv")) {
+  download.file(url1, "training.csv")
+}
+if (!file.exists("testing.csv")) {
+  download.file(url2, "testing.csv")
+}
+
+WLE <- read.csv("training.csv", na.strings=c("", "NA"))
+testing <- read.csv("testing.csv", na.strings=c("", "NA"))
+
+str(WLE, list.len=10) ## cols 1:7 are identifiers and will not be useful in prediction
+WLE[,8:159] <- lapply(WLE[,8:159], as.numeric) ## convert to numeric
+small_WLE <- WLE[,-c(1:7)] ## remove first 7 columns
+totalNAs <- is.na(apply(small_WLE[,-153], 2, sum)) ## identify columns with missing values
+build <- small_WLE[,!totalNAs] ## exclude columns with missing values
+rm(small_WLE, totalNAs) ## clean up the environment
+```
+  
+## Building the Models  
+Next, I split the `build` data into `training` and `validation` (for out-of-sample error estimates) sets using the `caret` package. I also loaded the `rpart` and `randomForest` packages that the future models would require for training.     
+```{r}
+library(caret)
+library(rpart); library(randomForest)
+inBuild <- createDataPartition(build$classe, p=0.7, list=FALSE)
+validation <- build[-inBuild,]; training <- build[inBuild,]
+```
+  
+Then, I generated my models. I began with the most computationally simple and easiest model to understand: the decision tree.  
+```{r cache=T}
+set.seed(1001)
+s0 <- system.time({fit0 <- train(classe~., data=training, method="rpart")})[3] ## decision tree
+pred0 <- predict(fit0, validation)
+cm0 <- confusionMatrix(pred0, validation$classe)[2:3]
+print(cm0)
+print(s0)
+```
+  
+The decision tree in this case was a poor model: it predicted the `classe` variable with an accuracy of 49%. The model failed to identify the class D ([4](#4)). However, it trained relatively quickly in 13 seconds while running on a single core.  
+  
+Next, I generated a random forest algorithm also using the `caret` package. My machine had 32 cores, so I was able to run the following tasks in parallel using the `doParallel` package ([5](#5)).  
+```{r cache=T}
+library(doParallel)
+cl <- makeCluster(detectCores())
+print(cl)
+registerDoParallel(cl)
+set.seed(1001)
+s1 <- system.time({fit1 <- train(classe~., data=training, method="rf", allowParallel=TRUE)})[3] ## random forest
+stopCluster(cl)
+pred1 <- predict(fit1, validation)
+cm1 <- confusionMatrix(pred1, validation$classe)[2:3]
+print(cm1)
+print(s1)
+```
+  
+While this method is extremely accurate, correctly predicting the classe variable with 99% accuracy, it was computationally expensive. Using 32 cores, it still took 328 seconds to train. In machine learning, there is a tradeoff between computational expense and model accuracy. To reduce the amount of time spent training, I re-ran the model using 3-fold cross validation ([4](#4), [6](#6)). 
+  
+```{r cache=T}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+set.seed(1001)
+s1.1 <- system.time({fit1.1 <- train(classe~., data=training, method="rf", allowParallel=TRUE,
+                trControl = trainControl(method="cv", number=3))})[3] ## rf with 3-fold CV
+stopCluster(cl)
+pred1.1 <- predict(fit1.1, validation)
+cm1.1 <- confusionMatrix(pred1.1, validation$classe)[2:3]
+print(cm1.1)
+print(s1.1)
+```
+  
+By cutting the size of the training data through 3-fold cross-validation, my time to train decreased super-linearly from 328 to 99 seconds (70% reduction). The trade-off was a 0.07% decrease in accuracy. I plotted the model's converged error to determine the optimum number of trees to train.  
+
+```{r}
+plot(fit1.1$finalModel) 
+```
+  
+The overall error for `fit1.1` converged at around 100 trees ([4](#4)). I tuned my number of trees to 100 for a third random forest model, `fit1.2`, to generate a faster algorithm.  
+
+```{r cache=T}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+set.seed(1001)
+s1.2 <- system.time({fit1.2 <- train(classe~., data=training, method="rf", allowParallel=TRUE,
+                ntree = 100, trControl = trainControl(method="cv", number=3))})[3] ## rf, 3-fold CV, 100 trees
+stopCluster(cl)
+pred1.2 <- predict(fit1.2, validation)
+cm1.2 <- confusionMatrix(pred1.2, validation$classe)[2:3]
+print(cm1.2)
+print(s1.2)
+```
+  
+The tuned random forest model with cross-validation performed with an out-of-sample accuracy of 99% and only took 26 seconds to train.  
+  
+Next, I explored meta-algorithms by creating a boosting algorithm with 3-fold cross-validation.  
+```{r cache=T}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+set.seed(100)
+s2 <- system.time({fit2 <- train(classe~., data=training, method="gbm", verbose=FALSE, 
+                                 trControl=trainControl(method="cv", number=3))})[3] ## boosting with 3-fold CV
+stopCluster(cl)
+pred2 <- predict(fit2, validation)
+cm2 <- confusionMatrix(pred2, validation$classe)[2:3]
+print(cm2)
+print(s2)
+```
+  
+The model generated 96% out-of-sample accuracy and trained in 54 seconds.  
+  
+Finally, I generated a bagging algorithm to predict the `classe` variable.  
+```{r cache=T}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+set.seed(1001)
+s3 <- system.time({fit3 <- train(classe~., data=training, method="treebag")})[3] ## bagging
+stopCluster(cl)
+pred3 <- predict(fit3, validation)
+cm3 <- confusionMatrix(pred3, validation$classe)[2:3]
+print(cm3)
+print(s3)
+```
+  
+The bagging model had 99% accuracy out-of-sample and trained in 50 seconds in parallel.  
+  
+## Model Evaluation  
+To select the best performing model, I generated a data frame of the models' out-of-sample accuracy and elapsed time to train. The random forest model without cross validation was the most accurate but also the most costly model. The random forest with cross-validation (untuned, rfcv) was a close second in terms of accuracy, but it was still more computationally expensive than the tuned random forest model (rfcv100), the boosting (boost), and the bagging (bag) models. The rfcv100 model was the ensemble method with the lowest time to train and was only 0.1% less accurate than the most accurate model.  
+```{r}
+eval <- data.frame(tree=cm0$overall[1], rf=cm1$overall[1], rfcv=cm1.1$overall[1], 
+                   rfcv100=cm1.2$overall[1], boost=cm2$overall[1], bag=cm3$overall[1])
+time <- data.frame(tree=s0, rf=s1, rfcv=s1.1, rfcv100=s1.2, boost=s2, bag=s3)
+res <- rbind(eval, time)
+print(res)
+```
+  
+I plotted the top ten most important variables from the rfcv100 model. Then, I viewed the final model and plotted its cross-validation graph and its error convergence.
+```{r}
+plot(varImp(fit1.2), top=10)
+fit1.2$finalModel
+plot(fit1.2)
+plot(fit1.2$finalModel)
+```
+  
+The optimum number of predictors in rfcv100 was 27. Using more or less than 27 predictors resulted in a decrease in accuracy. Additionally, the error convergence plot suggests that even fewer trees could be used to train the model to result in increased computational efficiency.  
+
+## Conclusion  
+I chose the random forest model with cross-validation and 100 trees (rfcv100, or `fit1.2`) to classify the wearable technology data because it was the ensemble method with the lowest time to train and the third-highest accuracy.  
+
+## Works cited  
+<a id="1">[1]</a> Human Activity Recognition (HAR) database. Retrieved from [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har) on 8 February 2017.  
+  
+<a id="2">[2]</a> Ugulino et al. 2012. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of the 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.  
+
+<a id="3">[3]</a> Cross-validation (statistics). Retrieved from [https://en.wikipedia.org/wiki/Cross-validation_(statistics)](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) on 25 February 2017.  
+  
+<a id="4">[4]</a> Juan C. 2015. An example of practical machine learning using R. Retrieved from [https://rstudio-pubs-static.s3.amazonaws.com/64455_df98186f15a64e0ba37177de8b4191fa.html](https://rstudio-pubs-static.s3.amazonaws.com/64455_df98186f15a64e0ba37177de8b4191fa.html)
+ on 8 February 2017.  
+  
+<a id="5">[5]</a> Shaikh S. 2015. Parallelize machine learning in R with multi-core CPUs. Retrieved from [http://sshaikh.org/2015/05/06/parallelize-machine-learning-in-r-with-multi-core-cpus/](http://sshaikh.org/2015/05/06/parallelize-machine-learning-in-r-with-multi-core-cpus/) on 25 February 2017.  
+   
+<a id="6">[6]</a> Tepper P. 2013. What is in general time complexity of random forest?... Retrieved from [https://www.quora.com/What-is-in-general-time-complexity-of-random-forest-What-are-the-important-parameters-that-affect-this-complexity](https://www.quora.com/What-is-in-general-time-complexity-of-random-forest-What-are-the-important-parameters-that-affect-this-complexity) on 25 February 2017.  
+  
